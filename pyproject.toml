@@ -1,0 +1,19 @@
+[project]
+name = "onprem-rag-practice"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.14"
+# 앱은 HTTP 클라이언트만. 모델 추론 라이브러리는 TEI/vLLM 컨테이너에 있다.
+# (requirements.txt 는 pip 사용자용 미러. uv 는 이 목록을 소스로 쓴다.)
+dependencies = [
+    "pymilvus==2.6.1",
+    "opensearch-py==2.8.0",
+    "httpx==0.28.1",
+    "openai==1.59.6",
+    "pdfplumber==0.11.4",
+    "fastapi==0.116.1",
+    "uvicorn[standard]==0.35.0",
+    "pydantic-settings==2.10.1",
+    "python-dotenv==1.1.1",
+]

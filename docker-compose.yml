@@ -1,0 +1,136 @@
+# 통합 스택: OpenSearch + Milvus(standalone) + 모델 서버(TEI x2, vLLM).
+#
+# 기본은 CPU(노트북에서도 뜸). GPU 는 오버레이로 얹는다:
+#   CPU:  docker compose --profile models up -d
+#   GPU:  docker compose -f docker-compose.yml -f docker-compose.gpu.yml --profile models up -d
+#   (Makefile 의 up-cpu / up-search / up 이 이걸 감싼다)
+#
+# 프로파일:
+#   - (없음)          : DB 계층만
+#   - models          : TEI 임베딩 + 리랭커
+#   - llm             : vLLM (GPU 전용. CPU 로는 못 씀 → LLM 은 OpenAI 로)
+#
+# ⚠️ 무엇이 GPU 를 요구하나: LLM(vLLM 7B)만 사실상 GPU 필수. 임베딩/리랭커/DB 는 CPU 가능.
+#    단일 T4 로 전부 fp16 은 메모리 초과(~20GB>16GB) → LLM 은 OpenAI 권장.
+
+services:
+  # ---------- 키워드 검색 (BM25) ----------
+  opensearch:
+    image: opensearchproject/opensearch:3.1.0
+    # build: { context: ., dockerfile: Dockerfile.opensearch }   # nori 쓸 때 이 줄로 교체
+    container_name: opensearch-dev
+    environment:
+      - discovery.type=single-node
+      - DISABLE_SECURITY_PLUGIN=true
+      - OPENSEARCH_JAVA_OPTS=-Xms512m -Xmx512m
+      - bootstrap.memory_lock=true
+    ulimits:
+      memlock: { soft: -1, hard: -1 }
+    ports:
+      - "9200:9200"
+      - "9600:9600"
+    volumes:
+      - opensearch-data:/usr/share/opensearch/data
+
+  # ---------- Milvus standalone 3종 세트 ----------
+  etcd:
+    image: quay.io/coreos/etcd:v3.5.18
+    container_name: milvus-etcd
+    environment:
+      - ETCD_AUTO_COMPACTION_MODE=revision
+      - ETCD_AUTO_COMPACTION_RETENTION=1000
+      - ETCD_QUOTA_BACKEND_BYTES=4294967296
+      - ETCD_SNAPSHOT_COUNT=50000
+    command: etcd -advertise-client-urls=http://etcd:2379 -listen-client-urls http://0.0.0.0:2379 --data-dir /etcd
+    volumes:
+      - etcd-data:/etcd
+
+  minio:
+    image: minio/minio:RELEASE.2024-05-28T17-19-04Z
+    container_name: milvus-minio
+    environment:
+      MINIO_ACCESS_KEY: minioadmin
+      MINIO_SECRET_KEY: minioadmin
+    command: minio server /data --console-address ":9001"
+    volumes:
+      - minio-data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+
+  milvus-standalone:
+    image: milvusdb/milvus:v2.6.3
+    container_name: milvus-standalone
+    command: ["milvus", "run", "standalone"]
+    environment:
+      ETCD_ENDPOINTS: etcd:2379
+      MINIO_ADDRESS: minio:9000
+    volumes:
+      - milvus-data:/var/lib/milvus
+    ports:
+      - "19530:19530"   # gRPC (pymilvus)
+      - "9091:9091"     # metrics / health
+    depends_on:
+      - etcd
+      - minio
+
+  # ---------- 모델 서버 (기본 CPU / GPU 는 docker-compose.gpu.yml) ----------
+  tei-embedding:
+    image: ghcr.io/huggingface/text-embeddings-inference:cpu-1.8  # 기본 CPU
+    container_name: tei-embedding
+    profiles: ["models"]
+    command: ["--model-id", "BAAI/bge-m3", "--max-client-batch-size", "32", "--max-batch-tokens", "8192"]
+    environment:
+      - HF_TOKEN=${HF_TOKEN:-}
+    ports:
+      - "8080:80"
+    volumes:
+      - hf-cache:/data
+
+  tei-reranker:
+    image: ghcr.io/huggingface/text-embeddings-inference:cpu-1.8  # 기본 CPU
+    container_name: tei-reranker
+    profiles: ["models"]
+    command: ["--model-id", "BAAI/bge-reranker-v2-m3"]  # cross-encoder → /rerank 자동 노출
+    environment:
+      - HF_TOKEN=${HF_TOKEN:-}
+    ports:
+      - "8081:80"
+    volumes:
+      - hf-cache:/data
+
+  vllm:
+    image: vllm/vllm-openai:v0.6.3
+    container_name: vllm
+    profiles: ["llm"]   # GPU 전용. CPU 로는 안 띄우고 LLM 은 OpenAI 로.
+    command:
+      - "--model=skt/A.X-4.0-Light"
+      - "--dtype=float16"          # T4 는 bf16 미지원
+      - "--max-model-len=8192"
+      - "--gpu-memory-utilization=0.55"
+      # 메모리 빠듯하면 4bit:
+      # - "--quantization=bitsandbytes"
+      # - "--load-format=bitsandbytes"
+    environment:
+      - HF_TOKEN=${HF_TOKEN:-}
+    ports:
+      - "8001:8000"
+    volumes:
+      - hf-cache:/root/.cache/huggingface
+    ipc: host
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+volumes:
+  opensearch-data:
+  etcd-data:
+  minio-data:
+  milvus-data:
+  hf-cache:

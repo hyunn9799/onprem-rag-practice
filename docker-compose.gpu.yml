@@ -1,0 +1,24 @@
+# GPU 오버레이: TEI(임베딩/리랭커)를 GPU(T4=Turing) 이미지로 바꾸고 GPU 예약을 얹는다.
+# 사용:
+#   docker compose -f docker-compose.yml -f docker-compose.gpu.yml --profile models up -d
+# (Makefile 의 up-search / up 이 이걸 자동으로 붙인다. 기본 docker-compose.yml 은 CPU.)
+services:
+  tei-embedding:
+    image: ghcr.io/huggingface/text-embeddings-inference:turing-1.8  # T4=Turing 전용 태그
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+  tei-reranker:
+    image: ghcr.io/huggingface/text-embeddings-inference:turing-1.8
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]

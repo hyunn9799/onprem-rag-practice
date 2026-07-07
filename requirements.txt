@@ -1,0 +1,19 @@
+# 앱은 모델을 직접 로드하지 않는다. torch/transformers/FlagEmbedding 등 무거운
+# 추론 라이브러리는 TEI/vLLM 컨테이너 이미지 안에 있고, 앱은 HTTP 클라이언트만 둔다.
+
+# --- vector / keyword store clients ---
+pymilvus==2.6.1
+opensearch-py==2.8.0
+
+# --- model serving clients (모델은 TEI/vLLM 컨테이너, 앱은 HTTP 호출) ---
+httpx==0.28.1          # TEI 임베딩/리랭커 호출
+openai==1.59.6         # vLLM(OpenAI 호환) / OpenAI LLM 호출
+
+# --- PDF 파싱 (parser) ---
+pdfplumber==0.11.4
+
+# --- service / util ---
+fastapi==0.116.1
+uvicorn[standard]==0.35.0
+pydantic-settings==2.10.1
+python-dotenv==1.1.1

@@ -1,0 +1,16 @@
+# 검색 평가 정답셋 (qrels). 한 줄 = JSON 하나. '#' 줄은 주석.
+# 형식: {"question": "<질문>", "relevant": ["<정답 chunk_id>", ...]}
+# 페이지 단위 청킹이므로 chunk_id = "<doc_id>#p<page>" (예: hyosung-2023-vol3#p3).
+#
+# 아래는 2023 VOL.3 실제 내용 기반 10문항(검증됨). 나머지 vol(2021/2022/2024)도
+# 같은 방식으로 추가해 20~30문항으로 늘리면 평가가 더 탄탄해진다.
+{"question": "국내 최초로 개발한 친환경 절연유 변압기의 전압 등급은?", "relevant": ["hyosung-2023-vol3#p3"]}
+{"question": "친환경 합성유(Synthetic Ester)의 연소점은 몇 도인가?", "relevant": ["hyosung-2023-vol3#p3"]}
+{"question": "효성중공업이 2019년 영국 National Grid에 설치한 친환경 합성유 변압기의 용량은?", "relevant": ["hyosung-2023-vol3#p3"]}
+{"question": "저진동 차단기가 적용된 싱가포르 지하변전소 프로젝트 이름은?", "relevant": ["hyosung-2023-vol3#p4"]}
+{"question": "차단기 진동저감 설계 적용 전후의 진동 저감 효과는 몇 퍼센트인가?", "relevant": ["hyosung-2023-vol3#p4"]}
+{"question": "효성중공업이 남아공 에스콤(Eskom)에 공급한 ESS의 용량 규모는?", "relevant": ["hyosung-2023-vol3#p5"]}
+{"question": "남아공 ESS 사업 계약에 포함된 준공 후 유지보수(O&M) 기간은?", "relevant": ["hyosung-2023-vol3#p5"]}
+{"question": "전력설비 자산관리 국제 표준 ISO 55000이 제정된 연도는?", "relevant": ["hyosung-2023-vol3#p6"]}
+{"question": "효성의 전력설비 자산관리 솔루션 ARMOUR가 처음 개발된 연도는?", "relevant": ["hyosung-2023-vol3#p6", "hyosung-2023-vol3#p7"]}
+{"question": "효성중공업이 전력설비 자산관리 분야에서 보유한 국내 특허 건수는?", "relevant": ["hyosung-2023-vol3#p7"]}
