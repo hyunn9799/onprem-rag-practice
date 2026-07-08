@@ -1,4 +1,4 @@
 # 한국어 BM25 품질을 위해 nori 분석기를 넣은 커스텀 OpenSearch 이미지.
-# 사용법: docker-compose.opensearch.yml 에서 image 를 주석 처리하고 build 줄을 활성화.
+# 사용법: docker-compose.yml 의 opensearch 서비스에서 image 를 주석 처리하고 build 줄을 활성화.
 FROM opensearchproject/opensearch:3.1.0
 RUN /usr/share/opensearch/bin/opensearch-plugin install --batch analysis-nori

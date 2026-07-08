@@ -42,7 +42,9 @@ class MilvusRetriever:
         schema = self.client.create_schema(auto_id=False, enable_dynamic_field=True)
         schema.add_field("chunk_id", DataType.VARCHAR, is_primary=True, max_length=128)
         schema.add_field("doc_id", DataType.VARCHAR, max_length=128)
-        schema.add_field("text", DataType.VARCHAR, max_length=8192)
+        # max_length 는 '글자'가 아니라 'UTF-8 바이트' 기준 — 한글은 글자당 3바이트라
+        # 4천자 페이지가 1.2만 바이트를 넘는다. 페이지 청킹이므로 최대치(65535)로.
+        schema.add_field("text", DataType.VARCHAR, max_length=65535)
         schema.add_field("meta", DataType.VARCHAR, max_length=2048)  # JSON: page/section/source
         schema.add_field("embedding", DataType.FLOAT_VECTOR, dim=settings.embedding_dim)
 

@@ -43,6 +43,7 @@ DB(OpenSearch/Milvus)와 모델 서버(TEI 임베딩·리랭커, vLLM LLM)를 **
 모든 명령은 `Makefile` 로 규격화되어 있다. (`make help` 로 전체 목록)
 > Windows 는 git bash / WSL 에서 `make` 실행. `make` 가 없으면 각 target 의 명령을 직접 복사해 쓴다.
 > **T4 에서 처음 띄운다면 → [`docs/t4-startup-checklist.md`](docs/t4-startup-checklist.md)** (GPU 패스스루·메모리 경로·스모크 테스트).
+> **재시작 루틴 / 팀원 온보딩 / FAQ → [`docs/runbook.md`](docs/runbook.md)** ★일상 사용은 이 문서 하나면 충분★
 
 ```bash
 # 0) 준비
@@ -105,7 +106,6 @@ LLM_PROVIDER=local                 # 기본: 로컬 vLLM (http://localhost:8001/
 onprem-rag-practice/
 ├── docker-compose.yml              # 통합 스택(기본 CPU): DB + TEI x2(models) + vLLM(llm)
 ├── docker-compose.gpu.yml          # GPU 오버레이: TEI 를 T4 이미지 + GPU 예약으로
-├── docker-compose.opensearch.yml   # (구) OpenSearch 단독 — 참고용
 ├── Dockerfile.opensearch           # nori 분석기 포함 커스텀 이미지(선택)
 ├── Makefile                        # up / up-search / ingest / serve / query / health ...
 ├── docs/t4-startup-checklist.md    # T4 실기동 체크리스트

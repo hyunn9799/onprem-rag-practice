@@ -17,3 +17,6 @@ wheels/
 
 # Milvus Lite 로컬 파일
 *.db
+.env
+env
+/.env

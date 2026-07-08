@@ -16,8 +16,10 @@
 services:
   # ---------- 키워드 검색 (BM25) ----------
   opensearch:
-    image: opensearchproject/opensearch:3.1.0
-    # build: { context: ., dockerfile: Dockerfile.opensearch }   # nori 쓸 때 이 줄로 교체
+    # nori(한국어 형태소) 플러그인 포함 커스텀 이미지. 플러그인이 설치돼 있어도
+    # 실제 사용 여부는 .env 의 OPENSEARCH_ANALYZER(standard|nori)가 결정한다.
+    build: { context: ., dockerfile: Dockerfile.opensearch }
+    image: onprem-rag/opensearch-nori:3.1.0
     container_name: opensearch-dev
     environment:
       - discovery.type=single-node
@@ -93,7 +95,10 @@ services:
     image: ghcr.io/huggingface/text-embeddings-inference:cpu-1.8  # 기본 CPU
     container_name: tei-reranker
     profiles: ["models"]
-    command: ["--model-id", "BAAI/bge-reranker-v2-m3"]  # cross-encoder → /rerank 자동 노출
+    # cross-encoder → /rerank 자동 노출. max-batch-tokens 를 안 주면 기본 16384 로
+    # warmup 활성화 버퍼가 커져 임베딩과 같은 GPU 에서 CUDA OOM 이 난다(T4 16GB).
+    # auto-truncate: 모델 max_input(8192) 보다 작은 배치토큰을 쓰기 위한 필수 플래그.
+    command: ["--model-id", "BAAI/bge-reranker-v2-m3", "--max-batch-tokens", "4096", "--auto-truncate"]
     environment:
       - HF_TOKEN=${HF_TOKEN:-}
     ports:
