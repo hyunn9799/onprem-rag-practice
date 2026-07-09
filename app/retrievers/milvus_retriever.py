@@ -3,7 +3,7 @@
 - dim 은 BGE-M3 에 맞춰 1024.
 - BGE-M3 dense 는 코사인 유사도가 표준 → metric_type=COSINE, index=HNSW.
 - chunk_id 를 PK 로 써서 OpenSearch 와 동일 키로 맞춘다(RRF 병합 조건).
-- 출처 메타데이터(page/section/source)는 meta(VARCHAR, JSON 문자열)로 저장·반환한다.
+- 출처 메타데이터(META_FIELDS: page/source)는 meta(VARCHAR, JSON 문자열)로 저장·반환한다.
   → 스키마 변경이므로 기존 컬렉션은 make reindex 로 재구축해야 반영된다.
 """
 from __future__ import annotations
@@ -13,9 +13,8 @@ from typing import Dict, List
 
 from pymilvus import DataType, MilvusClient
 
+from app.schema import META_FIELDS as _META_KEYS  # 단일 소스 — 로컬 복제 금지
 from app.config import settings
-
-_META_KEYS = ("page", "section", "source")
 
 
 def _dump_meta(chunk: Dict) -> str:
@@ -45,7 +44,7 @@ class MilvusRetriever:
         # max_length 는 '글자'가 아니라 'UTF-8 바이트' 기준 — 한글은 글자당 3바이트라
         # 4천자 페이지가 1.2만 바이트를 넘는다. 페이지 청킹이므로 최대치(65535)로.
         schema.add_field("text", DataType.VARCHAR, max_length=65535)
-        schema.add_field("meta", DataType.VARCHAR, max_length=2048)  # JSON: page/section/source
+        schema.add_field("meta", DataType.VARCHAR, max_length=2048)  # JSON: META_FIELDS(page/source)
         schema.add_field("embedding", DataType.FLOAT_VECTOR, dim=settings.embedding_dim)
 
         index_params = self.client.prepare_index_params()
@@ -62,6 +61,13 @@ class MilvusRetriever:
     def drop(self) -> None:
         if self.client.has_collection(self.collection):
             self.client.drop_collection(self.collection)
+
+    def delete_by_doc_id(self, doc_ids: List[str]) -> None:
+        """해당 문서들의 기존 청크 전부 삭제(재적재 시 stale 청크 방지)."""
+        if not doc_ids or not self.client.has_collection(self.collection):
+            return
+        expr = f"doc_id in {json.dumps(list(doc_ids), ensure_ascii=False)}"
+        self.client.delete(collection_name=self.collection, filter=expr)
 
     def upsert(self, chunks: List[Dict], embeddings: List[List[float]]) -> None:
         # 개수 불일치 시 zip 이 조용히 잘려 store 간 데이터 불일치가 생긴다 → 먼저 막는다.
@@ -88,12 +94,17 @@ class MilvusRetriever:
             anns_field="embedding",
             limit=top_k,
             search_params={"metric_type": "COSINE", "params": {"ef": 128}},
-            output_fields=["chunk_id", "text", "meta"],
+            output_fields=["chunk_id", "doc_id", "text", "meta"],
         )
         results: List[Dict] = []
         for h in res[0]:
             e = h["entity"]
-            item = {"chunk_id": e["chunk_id"], "text": e["text"], "score": h["distance"]}
+            item = {
+                "chunk_id": e["chunk_id"],
+                "doc_id": e.get("doc_id"),
+                "text": e["text"],
+                "score": h["distance"],
+            }
             item.update(_load_meta(e.get("meta")))
             results.append(item)
         return results

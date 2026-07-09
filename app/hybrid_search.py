@@ -14,6 +14,7 @@ from __future__ import annotations
 
 from typing import Dict, List, Tuple
 
+from app.schema import META_FIELDS as _META_KEYS  # 단일 소스 — 로컬 복제 금지
 from app.config import settings
 from app.embeddings.bge_m3_embedder import BGEM3Embedder
 from app.llm.ax_light import AXLightLLM
@@ -21,8 +22,6 @@ from app.rerank.bge_reranker import BGEReranker
 from app.retrievers.fusion import reciprocal_rank_fusion
 from app.retrievers.milvus_retriever import MilvusRetriever
 from app.retrievers.opensearch_retriever import OpenSearchRetriever
-
-_META_KEYS = ("page", "section", "source")
 
 
 def _to_source(c: Dict) -> Dict:
@@ -37,9 +36,16 @@ class HybridRAG:
         self.milvus = MilvusRetriever()
         self.opensearch = OpenSearchRetriever()
         self.reranker = BGEReranker() if settings.use_reranker else None
-        self.llm = AXLightLLM()
+        # LLM 은 /ask 전용 — 팀 계약의 /search 는 LLM 없이 동작해야 하므로,
+        # LLM 구성 실패(키 미설정 등)가 검색 서비스 부팅을 막지 않게 한다.
+        try:
+            self.llm = AXLightLLM()
+        except Exception as e:
+            print(f"[경고] LLM 미구성 — /search 는 정상, /ask 는 근거만 반환: {e}")
+            self.llm = None
 
-    def retrieve(self, question: str) -> Tuple[List[Dict], List[str]]:
+    def retrieve(self, question: str, top_k: int | None = None) -> Tuple[List[Dict], List[str]]:
+        top_k = top_k or settings.final_top_k
         warnings: List[str] = []
 
         # 벡터 경로(임베딩 + Milvus). 실패해도 BM25 로 폴백.
@@ -58,17 +64,17 @@ class HybridRAG:
             warnings.append(f"bm25 검색 실패: {e}")
 
         fused = reciprocal_rank_fusion(
-            [vector_hits, bm25_hits], k=settings.rrf_k, top_n=settings.final_top_k * 4
+            [vector_hits, bm25_hits], k=settings.rrf_k, top_n=top_k * 4
         )
         if self.reranker and fused:
             try:
-                fused = self.reranker.rerank(question, fused, top_k=settings.final_top_k)
+                fused = self.reranker.rerank(question, fused, top_k=top_k)
             except Exception as e:
                 # 리랭커만 죽어도 병합 결과로 답한다(리랭크 없이 상위 N).
                 warnings.append(f"rerank 실패(폴백): {e}")
-                fused = fused[: settings.final_top_k]
+                fused = fused[:top_k]
         else:
-            fused = fused[: settings.final_top_k]
+            fused = fused[:top_k]
         return fused, warnings
 
     def answer(self, question: str) -> Dict:
@@ -80,7 +86,17 @@ class HybridRAG:
                 "sources": [],
                 "warnings": warnings,
             }
-        answer = self.llm.generate(question, [c["text"] for c in contexts])
+        # 검색의 다른 단계처럼 LLM 도 장애/미구성 시 전체 500 대신 부분 결과로 답한다 —
+        # 검색이 성공했으면 근거 문서만이라도 사용자에게 전달하는 게 맞다.
+        if self.llm is None:
+            warnings.append("llm 미구성(OPENAI_API_KEY 없음 등) — 근거만 반환")
+            answer = "답변 생성기(LLM)가 구성되지 않았습니다. 아래 근거 문서를 참고해 주세요."
+        else:
+            try:
+                answer = self.llm.generate(question, [c["text"] for c in contexts])
+            except Exception as e:
+                warnings.append(f"llm 생성 실패(근거만 반환): {e}")
+                answer = "답변 생성기(LLM)에 연결할 수 없습니다. 아래 근거 문서를 참고해 주세요."
         return {
             "question": question,
             "answer": answer,

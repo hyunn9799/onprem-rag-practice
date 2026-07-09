@@ -1,40 +1,40 @@
 # 검색 평가 정답셋 (qrels). 한 줄 = JSON 하나. '#' 줄은 주석.
 # 형식: {"question": "<질문>", "relevant": ["<정답 chunk_id>", ...]}
-# 페이지 단위 청킹이므로 chunk_id = "<doc_id>#p<page>" (예: hyosung-2023-vol3#p3).
+# 팀 파서(pre-chunked) 형식: chunk_id = "<doc_id>_p<page:03d>" (예: hyosung_vol3_p003).
 # 전 문항 실제 페이지 내용을 확인하고 작성함(4개 vol 전체). 정답이 여러 페이지/
 # 여러 문서에 걸친 문항 포함 — 방법 간 차이를 드러내기 위한 난이도 믹스.
 #
 # ---- vol.3 (2023) : 10문항 ----
-{"question": "국내 최초로 개발한 친환경 절연유 변압기의 전압 등급은?", "relevant": ["hyosung-2023-vol3#p3"]}
-{"question": "친환경 합성유(Synthetic Ester)의 연소점은 몇 도인가?", "relevant": ["hyosung-2023-vol3#p3"]}
-{"question": "효성중공업이 2019년 영국 National Grid에 설치한 친환경 합성유 변압기의 용량은?", "relevant": ["hyosung-2023-vol3#p3"]}
-{"question": "저진동 차단기가 적용된 싱가포르 지하변전소 프로젝트 이름은?", "relevant": ["hyosung-2023-vol3#p4"]}
-{"question": "차단기 진동저감 설계 적용 전후의 진동 저감 효과는 몇 퍼센트인가?", "relevant": ["hyosung-2023-vol3#p4"]}
-{"question": "효성중공업이 남아공 에스콤(Eskom)에 공급한 ESS의 용량 규모는?", "relevant": ["hyosung-2023-vol3#p5"]}
-{"question": "남아공 ESS 사업 계약에 포함된 준공 후 유지보수(O&M) 기간은?", "relevant": ["hyosung-2023-vol3#p5"]}
-{"question": "전력설비 자산관리 국제 표준 ISO 55000이 제정된 연도는?", "relevant": ["hyosung-2023-vol3#p6"]}
-{"question": "효성의 전력설비 자산관리 솔루션 ARMOUR가 처음 개발된 연도는?", "relevant": ["hyosung-2023-vol3#p6", "hyosung-2023-vol3#p7"]}
-{"question": "효성중공업이 전력설비 자산관리 분야에서 보유한 국내 특허 건수는?", "relevant": ["hyosung-2023-vol3#p7"]}
+{"question": "국내 최초로 개발한 친환경 절연유 변압기의 전압 등급은?", "relevant": ["hyosung_vol3_p003"]}
+{"question": "친환경 합성유(Synthetic Ester)의 연소점은 몇 도인가?", "relevant": ["hyosung_vol3_p003"]}
+{"question": "효성중공업이 2019년 영국 National Grid에 설치한 친환경 합성유 변압기의 용량은?", "relevant": ["hyosung_vol3_p003"]}
+{"question": "저진동 차단기가 적용된 싱가포르 지하변전소 프로젝트 이름은?", "relevant": ["hyosung_vol3_p004"]}
+{"question": "차단기 진동저감 설계 적용 전후의 진동 저감 효과는 몇 퍼센트인가?", "relevant": ["hyosung_vol3_p004"]}
+{"question": "효성중공업이 남아공 에스콤(Eskom)에 공급한 ESS의 용량 규모는?", "relevant": ["hyosung_vol3_p005"]}
+{"question": "남아공 ESS 사업 계약에 포함된 준공 후 유지보수(O&M) 기간은?", "relevant": ["hyosung_vol3_p005"]}
+{"question": "전력설비 자산관리 국제 표준 ISO 55000이 제정된 연도는?", "relevant": ["hyosung_vol3_p006"]}
+{"question": "효성의 전력설비 자산관리 솔루션 ARMOUR가 처음 개발된 연도는?", "relevant": ["hyosung_vol3_p006", "hyosung_vol3_p007"]}
+{"question": "효성중공업이 전력설비 자산관리 분야에서 보유한 국내 특허 건수는?", "relevant": ["hyosung_vol3_p007"]}
 #
 # ---- vol.1 (2021) : 4문항 ----
-{"question": "효성중공업이 한국전력공사에 납품한 세계 최대 규모 스태콤의 용량은?", "relevant": ["hyosung-2021-vol1#p3", "hyosung-2021-vol1#p5"]}
-{"question": "효성중공업이 2006년 국내 최초로 자체 개발한 육상용 풍력발전기의 용량은?", "relevant": ["hyosung-2021-vol1#p5"]}
-{"question": "효성중공업의 국내 ESS 시장 점유율은 몇 퍼센트인가?", "relevant": ["hyosung-2021-vol1#p3"]}
-{"question": "신영주, 신충주 스태콤 설치로 송전 효율이 몇 퍼센트 향상되었나?", "relevant": ["hyosung-2021-vol1#p5"]}
+{"question": "효성중공업이 한국전력공사에 납품한 세계 최대 규모 스태콤의 용량은?", "relevant": ["hyosung_vol1_p003", "hyosung_vol1_p005"]}
+{"question": "효성중공업이 2006년 국내 최초로 자체 개발한 육상용 풍력발전기의 용량은?", "relevant": ["hyosung_vol1_p005"]}
+{"question": "효성중공업의 국내 ESS 시장 점유율은 몇 퍼센트인가?", "relevant": ["hyosung_vol1_p003"]}
+{"question": "신영주, 신충주 스태콤 설치로 송전 효율이 몇 퍼센트 향상되었나?", "relevant": ["hyosung_vol1_p005"]}
 #
 # ---- vol.2 (2022) : 5문항 ----
-{"question": "효성중공업의 2030년 온실가스 감축 목표는?", "relevant": ["hyosung-2022-vol2#p5", "hyosung-2022-vol2#p6"]}
-{"question": "효성중공업이 탄소발자국(전과정평가)을 산정한 대상 제품 두 가지는?", "relevant": ["hyosung-2022-vol2#p8", "hyosung-2022-vol2#p9"]}
-{"question": "효성중공업이 운영하는 수소충전소는 전국 몇 기인가?", "relevant": ["hyosung-2022-vol2#p7"]}
-{"question": "변압기 전과정 탄소배출량 중 사용 단계가 차지하는 비중은?", "relevant": ["hyosung-2022-vol2#p9"]}
-{"question": "ESG경영 추진위원회의 위원장은 누구이며 연간 몇 회 개최되는가?", "relevant": ["hyosung-2022-vol2#p5"]}
+{"question": "효성중공업의 2030년 온실가스 감축 목표는?", "relevant": ["hyosung_vol2_p005", "hyosung_vol2_p006"]}
+{"question": "효성중공업이 탄소발자국(전과정평가)을 산정한 대상 제품 두 가지는?", "relevant": ["hyosung_vol2_p008", "hyosung_vol2_p009"]}
+{"question": "효성중공업이 운영하는 수소충전소는 전국 몇 기인가?", "relevant": ["hyosung_vol2_p007"]}
+{"question": "변압기 전과정 탄소배출량 중 사용 단계가 차지하는 비중은?", "relevant": ["hyosung_vol2_p009"]}
+{"question": "ESG경영 추진위원회의 위원장은 누구이며 연간 몇 회 개최되는가?", "relevant": ["hyosung_vol2_p005"]}
 #
 # ---- vol.4 (2024) : 4문항 ----
-{"question": "SF6 가스의 지구온난화지수(GWP)는 얼마인가?", "relevant": ["hyosung-2024-vol4#p5"]}
-{"question": "국내 최초 SF6 Free 72.5kV GIS에 적용된 절연 매질은?", "relevant": ["hyosung-2024-vol4#p5"]}
-{"question": "효성중공업이 2021년 세계 최초로 개발한 최대 용량 DAIS의 정격 사양은?", "relevant": ["hyosung-2024-vol4#p6"]}
-{"question": "양주 HVDC 프로젝트의 용량과 연계 방식은?", "relevant": ["hyosung-2024-vol4#p7", "hyosung-2024-vol4#p8"]}
+{"question": "SF6 가스의 지구온난화지수(GWP)는 얼마인가?", "relevant": ["hyosung_vol4_p005"]}
+{"question": "국내 최초 SF6 Free 72.5kV GIS에 적용된 절연 매질은?", "relevant": ["hyosung_vol4_p005"]}
+{"question": "효성중공업이 2021년 세계 최초로 개발한 최대 용량 DAIS의 정격 사양은?", "relevant": ["hyosung_vol4_p006"]}
+{"question": "양주 HVDC 프로젝트의 용량과 연계 방식은?", "relevant": ["hyosung_vol4_p007", "hyosung_vol4_p008"]}
 #
 # ---- 문서 간 교차(ambiguous) : 2문항 — 정답이 서로 다른 vol 에 걸침 ----
-{"question": "국내 최초 400kV급 친환경 에스테르유 변압기 개발 실적을 알려줘", "relevant": ["hyosung-2023-vol3#p3", "hyosung-2024-vol4#p3"]}
-{"question": "효성중공업의 영국 ESS 시장 진출 성과는?", "relevant": ["hyosung-2021-vol1#p3", "hyosung-2021-vol1#p5", "hyosung-2022-vol2#p10"]}
+{"question": "국내 최초 400kV급 친환경 에스테르유 변압기 개발 실적을 알려줘", "relevant": ["hyosung_vol3_p003", "hyosung_vol4_p003"]}
+{"question": "효성중공업의 영국 ESS 시장 진출 성과는?", "relevant": ["hyosung_vol1_p003", "hyosung_vol1_p005", "hyosung_vol2_p010"]}

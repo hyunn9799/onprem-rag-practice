@@ -11,6 +11,7 @@
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 from pathlib import Path
@@ -26,14 +27,20 @@ def make_doc_id(pdf_path: Path) -> str:
     """파일명에서 짧고 안정적인 doc_id 를 만든다.
 
     '2023_Hyosung_..._vol.3_kor.pdf' -> 'hyosung-2023-vol3'
-    규칙에 안 맞으면 파일 stem 을 슬러그화(소문자-하이픈).
+    브랜드 토큰을 파일명에서 뽑는다(하드코딩 금지 — 다른 회사 문서가 같은
+    연도+vol 이어도 충돌하지 않게). 규칙에 안 맞으면 한글을 보존한 슬러그,
+    그마저 비면 파일명 해시 — 어떤 파일명이든 빈 doc_id 는 나오지 않는다.
     """
     stem = pdf_path.stem
     year = re.search(r"(20\d{2})", stem)
     vol = re.search(r"vol[._\s]*?(\d+)", stem, re.IGNORECASE)
-    if year and vol:
-        return f"hyosung-{year.group(1)}-vol{vol.group(1)}"
-    return re.sub(r"[^a-z0-9]+", "-", stem.lower()).strip("-")
+    brand = re.search(r"[A-Za-z가-힣][A-Za-z가-힣]+", stem)  # 첫 단어(연도/숫자 제외)
+    if year and vol and brand:
+        return f"{brand.group(0).lower()}-{year.group(1)}-vol{vol.group(1)}"
+    slug = re.sub(r"[^0-9a-z가-힣]+", "-", stem.lower()).strip("-")
+    if not slug:
+        slug = "doc-" + hashlib.sha1(stem.encode("utf-8")).hexdigest()[:8]
+    return slug
 
 
 def extract_pages(pdf_path: Path) -> List[Dict]:
@@ -69,6 +76,17 @@ def parse_all(raw_dir: str = RAW_DIR, processed_dir: str = PROCESSED_DIR) -> int
     if not pdfs:
         print(f"{raw_dir} 에 PDF 가 없습니다. (data/raw 에 PDF 를 넣으세요)")
         return 0
+
+    # doc_id 는 두 store 의 upsert 키(chunk_id)의 뿌리 — 중복이면 문서끼리
+    # 조용히 덮어쓰므로 파싱 단계에서 즉시 실패시킨다.
+    seen: Dict[str, str] = {}
+    for pdf in pdfs:
+        did = make_doc_id(pdf)
+        if did in seen:
+            raise SystemExit(
+                f"doc_id 충돌: '{did}' ← '{seen[did]}' 와 '{pdf.name}'. 파일명을 바꿔주세요."
+            )
+        seen[did] = pdf.name
 
     total = 0
     for pdf in pdfs:

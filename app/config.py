@@ -15,7 +15,8 @@ class Settings(BaseSettings):
     opensearch_host: str = "localhost"
     opensearch_port: int = 9200
     opensearch_index: str = "rag_chunks"
-    opensearch_analyzer: str = "standard"  # "nori" 로 바꾸면 한국어 형태소 분석
+    opensearch_analyzer: str = "nori"      # 한국어 형태소 분석(기본). 이미지에 analysis-nori 필요
+    recreate_index: bool = False           # True: analyzer 불일치 시 index 재생성(재적재 필요)
 
     # Milvus
     milvus_uri: str = "http://localhost:19530"
@@ -39,16 +40,15 @@ class Settings(BaseSettings):
     openai_base_url: str = "https://api.openai.com/v1"
     openai_model: str = "gpt-4o-mini"
 
-    # Chunking
-    chunk_strategy: str = "page"   # "page"(1페이지=1청크) | "char"(문자 슬라이딩)
-    chunk_size: int = 500          # char 전략일 때만
-    chunk_overlap: int = 80        # char 전략일 때만 (size > overlap)
-
     # Retrieval knobs
     bm25_top_k: int = 20
     vector_top_k: int = 20
     rrf_k: int = 60
     final_top_k: int = 5
+
+    # Ingest / Eval
+    ingest_allow_sample: bool = False          # True: processed 비었을 때 샘플 적재 허용
+    eval_qrels: str = "data/eval/qrels.jsonl"  # 평가 정답셋 경로
 
 
 @lru_cache

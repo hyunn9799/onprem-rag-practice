@@ -9,14 +9,12 @@
 """
 from __future__ import annotations
 
-import os
 from typing import Dict, List
 
 from opensearchpy import OpenSearch, helpers
 
+from app.schema import META_FIELDS as _META_KEYS  # 단일 소스 — 로컬 복제 금지
 from app.config import settings
-
-_META_KEYS = ("page", "section", "source")
 
 
 class OpenSearchRetriever:
@@ -39,7 +37,6 @@ class OpenSearchRetriever:
                     "doc_id": {"type": "keyword"},
                     "text": {"type": "text", "analyzer": analyzer},
                     "page": {"type": "integer"},
-                    "section": {"type": "keyword"},
                     "source": {"type": "keyword"},
                 }
             },
@@ -47,26 +44,35 @@ class OpenSearchRetriever:
         self.client.indices.create(index=self.index, body=body)
 
     def _check_analyzer(self) -> None:
-        """기존 index 의 text analyzer 가 설정과 일치하는지 확인."""
+        """기존 index 의 text analyzer 가 설정과 일치하는지 확인.
+
+        검사를 못 하면 조용히 넘기지 않고 경고를 남긴다 — 이 검사가 스킵되면
+        stale analyzer 색인으로 실험/서빙이 착시가 되기 때문.
+        """
         try:
             mapping = self.client.indices.get_mapping(index=self.index)
-            current = mapping[self.index]["mappings"]["properties"]["text"].get(
-                "analyzer", "standard"
-            )
-        except Exception:
+        except Exception as e:  # 연결 오류 등 — 검사 불가를 명시적으로 알린다
+            print(f"[경고] analyzer 검사를 수행하지 못했습니다(건너뜀): {e}")
             return
+        current = (
+            mapping.get(self.index, {})
+            .get("mappings", {})
+            .get("properties", {})
+            .get("text", {})
+            or {}
+        ).get("analyzer", "standard")
         want = settings.opensearch_analyzer
         if current == want:
             return
-        if os.getenv("RECREATE_INDEX") == "1":
+        if settings.recreate_index:  # .env 의 RECREATE_INDEX=true 로 켠다
             print(f"[재생성] OpenSearch index analyzer '{current}' -> '{want}'")
             self.client.indices.delete(index=self.index)
             self._create_index()
         else:
             print(
                 f"[경고] 기존 index analyzer='{current}' != 설정 '{want}'. "
-                "기존 index 는 그대로라 실험이 착시가 됩니다. "
-                "RECREATE_INDEX=1 로 재생성하거나 make reindex 하세요."
+                "기존 index 는 그대로라 검색이 착시가 됩니다. "
+                ".env 에 RECREATE_INDEX=true 를 넣고 재적재하거나 make rebuild-bm25 하세요."
             )
 
     def ensure_index(self) -> None:
@@ -78,6 +84,16 @@ class OpenSearchRetriever:
     def drop(self) -> None:
         if self.client.indices.exists(self.index):
             self.client.indices.delete(index=self.index)
+
+    def delete_by_doc_id(self, doc_ids: List[str]) -> None:
+        """해당 문서들의 기존 청크 전부 삭제(재적재 시 stale 청크 방지)."""
+        if not doc_ids or not self.client.indices.exists(self.index):
+            return
+        self.client.delete_by_query(
+            index=self.index,
+            body={"query": {"terms": {"doc_id": list(doc_ids)}}},
+            refresh=True,
+        )
 
     def index_chunks(self, chunks: List[Dict]) -> None:
         actions = []
@@ -101,7 +117,12 @@ class OpenSearchRetriever:
         results: List[Dict] = []
         for h in res["hits"]["hits"]:
             src = h["_source"]
-            item = {"chunk_id": src["chunk_id"], "text": src["text"], "score": h["_score"]}
+            item = {
+                "chunk_id": src["chunk_id"],
+                "doc_id": src.get("doc_id"),
+                "text": src["text"],
+                "score": h["_score"],
+            }
             item.update({k: src[k] for k in _META_KEYS if k in src})
             results.append(item)
         return results

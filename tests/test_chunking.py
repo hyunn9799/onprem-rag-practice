@@ -43,15 +43,31 @@ def test_char_strategy_still_splits():
     assert len(chunks) == 2
 
 
-def test_page_strategy_without_page_field():
-    chunks = to_chunks({"doc_id": "d", "text": "x"}, strategy="page")
-    assert chunks[0]["chunk_id"] == "d#0"
+def test_pageless_id_is_deterministic_and_content_based():
+    # page 없는 레코드: 배치 위치가 아니라 내용 해시 → 호출/순서와 무관하게 같은 id.
+    a1 = to_chunks({"doc_id": "d", "text": "내용A"}, strategy="page")
+    a2 = to_chunks({"doc_id": "d", "text": "내용A"}, strategy="page")
+    b = to_chunks({"doc_id": "d", "text": "내용B"}, strategy="page")
+    assert a1[0]["chunk_id"] == a2[0]["chunk_id"]      # 재호출에도 동일(결정론)
+    assert a1[0]["chunk_id"] != b[0]["chunk_id"]        # 다른 내용은 다른 id(덮어쓰기 방지)
 
 
-def test_page_strategy_pageless_uses_index_for_unique_id():
-    # 같은 doc_id 인데 page 가 없어도 index 로 유니크해야 함(#0 덮어쓰기 방지).
-    c0 = to_chunks({"doc_id": "d", "text": "a"}, strategy="page", index=0)
-    c1 = to_chunks({"doc_id": "d", "text": "b"}, strategy="page", index=1)
-    assert c0[0]["chunk_id"] == "d#0"
-    assert c1[0]["chunk_id"] == "d#1"
-    assert c0[0]["chunk_id"] != c1[0]["chunk_id"]
+def test_pageless_long_text_falls_back_to_char():
+    # page 전략 + page 없음 + 긴 텍스트 → 통짜 1청크(임베딩 잘림)가 아니라 char 분할.
+    chunks = to_chunks({"doc_id": "d", "text": "x" * 1200}, strategy="page", size=500, overlap=0)
+    assert len(chunks) > 1
+
+
+def test_char_strategy_namespaces_by_page_no_collision():
+    # 회귀: 같은 doc_id 의 페이지 레코드들을 char 로 쪼개도 chunk_id 가 충돌하지 않는다.
+    p1 = to_chunks({"doc_id": "d", "text": "a" * 10, "page": 1}, strategy="char", size=5, overlap=0)
+    p2 = to_chunks({"doc_id": "d", "text": "b" * 10, "page": 2}, strategy="char", size=5, overlap=0)
+    ids = [c["chunk_id"] for c in p1 + p2]
+    assert len(ids) == len(set(ids))                    # 전부 유니크
+    assert p1[0]["chunk_id"].startswith("d#p1-")        # 페이지 네임스페이스
+
+
+def test_empty_text_is_skipped_not_crashing():
+    # 빈/공백 레코드는 배치를 죽이지 않고 건너뛴다.
+    assert to_chunks({"doc_id": "d", "text": "   "}, strategy="page") == []
+    assert to_chunks({"doc_id": "d", "text": ""}, strategy="char") == []

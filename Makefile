@@ -7,7 +7,7 @@ GPU     = -f docker-compose.yml -f docker-compose.gpu.yml   # GPU 오버레이
 MODELS  = --profile models                                  # DB + TEI
 ALL     = --profile models --profile llm                    # + vLLM
 
-.PHONY: help up up-search up-cpu up-db up-models-gpu down logs ps health sync ingest ingest-sample reindex serve query eval test
+.PHONY: help up up-search up-cpu up-db up-models-gpu down logs ps health sync parse parse-legacy ingest ingest-sample reindex rebuild-bm25 serve query eval test
 
 help:                ## 명령 목록
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN{FS=":.*?## "}{printf "  \033[36m%-13s\033[0m %s\n", $$1, $$2}'
@@ -47,7 +47,12 @@ health:              ## 서비스 헬스 체크
 sync:                ## 파이썬 의존성 설치
 	uv sync
 
-parse:               ## PDF(data/raw) → data/processed JSONL (파서 구현 후 사용)
+parse:               ## (안내) 파싱은 팀 파서(app/parse_odl.py, 1번 담당) 소관
+	@echo "파싱은 팀 파서(app/parse_odl.py)가 담당합니다 — ODL+Tesseract 가 있는 1번 환경에서 실행."
+	@echo "산출물 hyosung_chunks.json 을 data/processed/ 에 넣으면 make ingest 가 그대로 소비합니다."
+	@echo "(pdfplumber 자체 파서가 필요하면: make parse-legacy — 단, 팀 코퍼스와 id 체계가 달라 섞이면 안 됨)"
+
+parse-legacy:        ## 자체 pdfplumber 파서(학습 참고용). ⚠️ 산출물엔 chunk_id 가 없어 현재 ingest 는 거부함
 	uv run python -m app.parsing.pdf_parser
 
 ingest:              ## 문서 적재 (data/processed → 임베딩 → Milvus/OpenSearch). 검색 전 필수
@@ -56,8 +61,11 @@ ingest:              ## 문서 적재 (data/processed → 임베딩 → Milvus/O
 ingest-sample:       ## 샘플 문서로 적재(개발용, 실문서 없을 때만 명시적으로)
 	INGEST_ALLOW_SAMPLE=1 uv run python -m app.ingestion
 
-reindex:             ## 두 store drop 후 data/processed 로 재구축(저장소 불일치/스키마 변경 후)
+reindex:             ## 두 store drop 후 data/processed 로 재구축(임베딩 서버 필요. ⚠️ API 적재분은 복원 안 됨)
 	uv run python -c "from app.ingestion import reindex; print('reindexed chunks:', reindex())"
+
+rebuild-bm25:        ## OpenSearch 만 재구축(analyzer 변경 적용용, 임베딩 불필요)
+	uv run python -c "from app.ingestion import rebuild_bm25; print('bm25 chunks:', rebuild_bm25())"
 
 serve:               ## FastAPI 서버 (POST /ingest, /ask)
 	uv run uvicorn app.main:app --host 0.0.0.0 --port 8000

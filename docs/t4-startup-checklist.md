@@ -106,10 +106,12 @@ curl -s localhost:8001/v1/models
 ## 6. 파이프라인 실행
 
 ```bash
-make ingest          # ★적재 먼저★ (안 하면 검색 0건)
+make parse           # PDF(data/raw) → data/processed  ← processed 가 비어 있으면 필수
+make ingest          # ★적재 먼저★ (안 하면 검색 0건. processed 비면 에러가 정상 — parse 먼저)
 make query           # 단발 질의 테스트
 # 또는
 make serve           # API 서버 → http://localhost:8000
+# 실문서 없이 스모크만: make ingest-sample
 ```
 
 `make ingest` 통과 기준: `ingested chunks: N` (N>0) 출력.

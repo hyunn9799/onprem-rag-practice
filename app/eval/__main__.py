@@ -6,18 +6,20 @@
 - 스택이 떠 있고(make up 또는 up-search) 문서가 적재돼 있어야 한다(make ingest).
 - LLM 은 쓰지 않는다 → vLLM/OpenAI 없이도 동작(검색 지표만).
 
-정답셋(qrels): 기본 data/eval/qrels.jsonl. 한 줄에 하나:
-    {"question": "지체상금은 하루에 얼마인가?", "relevant": ["policy-001#0"]}
-'#' 로 시작하는 줄은 주석으로 무시한다. EVAL_QRELS 로 경로 변경 가능.
+정답셋(qrels): 기본 data/eval/qrels.jsonl (.env 의 EVAL_QRELS 로 변경). 한 줄에 하나:
+    {"question": "지체상금은 하루에 얼마인가?", "relevant": ["policy-001#p1"]}
+'#' 로 시작하는 줄은 주석으로 무시한다.
 
-핵심 아이디어: hybrid_search.retrieve() 는 최종 결과 하나만 주므로(단계 관측 불가),
-여기서는 컴포넌트(milvus/opensearch/fusion/reranker)를 직접 호출해 단계별 순위를 만든다.
-그래야 "리랭커가 nDCG 를 얼마나 올렸나", "하이브리드가 BM25 단독보다 나은가"를 잴 수 있다.
+핵심 원칙: **프로덕션(hybrid_search.retrieve)과 동일한 깊이로 채점한다.**
+검색 깊이/RRF top_n/rerank top_k 를 전부 settings 에서 파생하므로, .env 의
+retrieval knob 을 바꾸면 eval 숫자도 그 구성 기준으로 바뀐다 — eval 이
+프로덕션이 절대 실행하지 않는 파이프라인을 채점하는 착시를 막는다.
+(단계별 결과를 따로 보기 위해 컴포넌트를 직접 호출하는 구조는 유지.)
 """
 from __future__ import annotations
 
 import json
-import os
+
 from pathlib import Path
 from typing import Dict, List
 
@@ -28,9 +30,6 @@ from app.rerank.bge_reranker import BGEReranker
 from app.retrievers.fusion import reciprocal_rank_fusion
 from app.retrievers.milvus_retriever import MilvusRetriever
 from app.retrievers.opensearch_retriever import OpenSearchRetriever
-
-QRELS_PATH = os.getenv("EVAL_QRELS", "data/eval/qrels.jsonl")
-DEPTH = 10  # 각 검색기 조회 깊이(top-k)
 
 # 리포트할 지표: (표기, 함수, k)
 REPORT = [
@@ -63,17 +62,16 @@ def load_qrels(path: str) -> List[Dict]:
 
 def rank_by_method(
     question: str,
-    embedder: BGEM3Embedder,
+    q_emb: List[float],
     milvus: MilvusRetriever,
     opensearch: OpenSearchRetriever,
     reranker: BGEReranker | None,
 ) -> Dict[str, List[str]]:
-    """한 질문에 대해 method -> 순위(chunk_id 리스트) 를 만든다."""
-    q_emb = embedder.embed_query(question)
-    vector_hits = milvus.search(q_emb, DEPTH)
-    bm25_hits = opensearch.search(question, DEPTH)
+    """한 질문에 대해 method -> 순위(chunk_id 리스트). 깊이는 프로덕션과 동일."""
+    vector_hits = milvus.search(q_emb, settings.vector_top_k)
+    bm25_hits = opensearch.search(question, settings.bm25_top_k)
     rrf_hits = reciprocal_rank_fusion(
-        [vector_hits, bm25_hits], k=settings.rrf_k, top_n=DEPTH
+        [vector_hits, bm25_hits], k=settings.rrf_k, top_n=settings.final_top_k * 4
     )
 
     ranked: Dict[str, List[str]] = {
@@ -82,14 +80,18 @@ def rank_by_method(
         "rrf": [h["chunk_id"] for h in rrf_hits],
     }
     if reranker is not None:
-        rr = reranker.rerank(question, rrf_hits, top_k=DEPTH)
+        rr = reranker.rerank(question, list(rrf_hits), top_k=settings.final_top_k)
         ranked["rrf+rerank"] = [h["chunk_id"] for h in rr]
     return ranked
 
 
 def print_table(methods: List[str], sums: Dict[str, Dict[str, float]], n: int) -> None:
     labels = [label for (label, _, _) in REPORT]
-    print(f"\n정답셋: {n} 질문 ({QRELS_PATH})  |  조회 깊이 DEPTH={DEPTH}\n")
+    print(
+        f"\n정답셋: {n} 질문 ({settings.eval_qrels})  |  "
+        f"깊이: vector={settings.vector_top_k} bm25={settings.bm25_top_k} "
+        f"rrf_top_n={settings.final_top_k * 4} rerank_top_k={settings.final_top_k}\n"
+    )
     header = f"{'method':<12}" + "".join(f"{lab:>9}" for lab in labels)
     print(header)
     print("-" * len(header))
@@ -100,13 +102,16 @@ def print_table(methods: List[str], sums: Dict[str, Dict[str, float]], n: int) -
 
 
 def run() -> None:
-    qrels = load_qrels(QRELS_PATH)
+    qrels = load_qrels(settings.eval_qrels)
     n = len(qrels)
 
     embedder = BGEM3Embedder()
     milvus = MilvusRetriever()
     opensearch = OpenSearchRetriever()
     reranker = BGEReranker() if settings.use_reranker else None
+
+    # 질문 임베딩은 한 번에 배치로 — 질문당 원격 왕복(N회)을 1회로 줄인다.
+    q_embs = embedder.embed_texts([row["question"] for row in qrels])
 
     methods = ["bm25", "vector", "rrf"]
     if reranker is not None:
@@ -116,9 +121,9 @@ def run() -> None:
         m: {label: 0.0 for (label, _, _) in REPORT} for m in methods
     }
 
-    for row in qrels:
+    for row, q_emb in zip(qrels, q_embs):
         relevant = set(row["relevant"])
-        ranked = rank_by_method(row["question"], embedder, milvus, opensearch, reranker)
+        ranked = rank_by_method(row["question"], q_emb, milvus, opensearch, reranker)
         for m in methods:
             for (label, fn, k) in REPORT:
                 sums[m][label] += fn(ranked[m], relevant, k)

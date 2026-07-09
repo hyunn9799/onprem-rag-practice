@@ -26,7 +26,7 @@ class BGEReranker:
             f"{self.api_url}/rerank",
             json={
                 "query": query,
-                "texts": [c["text"] for c in candidates],
+                "texts": [ c["text"] for c in candidates],
                 "truncate": True,
             },
         )
